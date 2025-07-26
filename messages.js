@@ -35,9 +35,10 @@ let currentRecipient = null;
 let messageListener = null;
 
 // --- DOM Elements ---
-const chatListElem = () => document.getElementById("chat-list");
+const chatListElem = () => document.getElementById("pm-user-select");
+const searchElem = () => document.getElementById("search-user");
 const chatHeaderElem = () => document.getElementById("chat-user");
-const messagesElem = () => document.getElementById("messages");
+const messagesElem = () => document.getElementById("pm-chat-window");
 
 // --- Loader ---
 function showLoader(show) {
@@ -46,7 +47,7 @@ function showLoader(show) {
 
 // --- Render Chat List ---
 function renderChatList() {
-  const search = (document.getElementById("search-user").value || "").toLowerCase();
+  const search = (searchElem().value || "").toLowerCase();
   const filtered = allMembers.filter(
     m => m.username !== myUsername && (!search || m.username.toLowerCase().includes(search))
   );
@@ -58,18 +59,18 @@ function renderChatList() {
 
   chatListElem().innerHTML = sorted.length
     ? sorted.map(m =>
-        `<li class="${currentRecipient===m.username ? "active" : ""}" data-username="${escapeHtml(m.username)}">
-          <div class="chat-avatar">${escapeHtml(m.username.charAt(0).toUpperCase())}</div>
-          <div class="chat-info">
-            <div class="chat-name">${escapeHtml(m.username)}</div>
-          </div>
-        </li>`
+        `<option value="${escapeHtml(m.username)}">${escapeHtml(m.username)}</option>`
       ).join("")
-    : `<li style="text-align:center;color:#7bffe9;">No users</li>`;
+    : `<option disabled>No users</option>`;
 
-  Array.from(chatListElem().querySelectorAll("li")).forEach(li => {
-    li.onclick = () => openChat(li.getAttribute("data-username"));
-  });
+  // If currentRecipient is not in filtered, reset to first
+  if (!sorted.find(m => m.username === currentRecipient)) {
+    currentRecipient = sorted.length ? sorted[0].username : null;
+  }
+  chatListElem().value = currentRecipient || "";
+
+  // If there is a recipient, open chat with them
+  if (currentRecipient) openChat(currentRecipient);
 }
 
 // --- Open Chat ---
@@ -79,9 +80,7 @@ function openChat(username) {
     messageListener = null;
   }
   currentRecipient = username;
-  chatHeaderElem().textContent = username ? username : "";
   messagesElem().innerHTML = `<div style="color:#7bffe9;padding:1em;text-align:center;">Loading...</div>`;
-  renderChatList();
 
   // Listen for messages
   const convKey = getConversationKey(myUsername, currentRecipient);
@@ -104,9 +103,9 @@ function openChat(username) {
 function renderMessageBubble(m) {
   const isMe = m.from === myUsername;
   return `
-    <div class="message-row ${isMe ? 'me' : 'them'}">
-      <div class="message-bubble">${escapeHtml(m.text)}
-        <div class="message-meta">${isMe ? "You" : escapeHtml(m.from)} &mdash; <span>${escapeHtml(m.time)}</span></div>
+    <div class="pm-message-row ${isMe ? 'self' : 'other'}">
+      <div class="pm-msg-bubble">${escapeHtml(m.text)}
+        <div class="pm-msg-meta">${isMe ? "You" : escapeHtml(m.from)} &mdash; <span>${escapeHtml(m.time)}</span></div>
       </div>
     </div>
   `;
@@ -138,9 +137,13 @@ document.addEventListener("DOMContentLoaded", async function() {
 
   // Logout
   document.getElementById("pm-logout-btn").onclick = function() {
-  clearMemberSession();
-  window.location.href = "index.html";
-};
+    clearMemberSession();
+    window.location.href = "index.html";
+  };
+  // Back
+  document.getElementById("pm-back-btn").onclick = function() {
+    window.location.href = "index.html";
+  };
 
   allMembers = await getMemberList();
   await updateChatUsers();
@@ -148,15 +151,17 @@ document.addEventListener("DOMContentLoaded", async function() {
   showLoader(false);
 
   // Search users
-  document.getElementById("search-user").oninput = renderChatList;
+  searchElem().oninput = renderChatList;
 
-  // Open first chat by default (if any)
-  if(chatUsers.length) openChat(chatUsers[0]);
+  // Change conversation partner
+  chatListElem().onchange = function() {
+    openChat(chatListElem().value);
+  };
 
   // Send message
-  document.getElementById("message-form").onsubmit = async function(e) {
+  document.getElementById("pm-new-msg-form").onsubmit = async function(e) {
     e.preventDefault();
-    const text = document.getElementById("message-input").value.trim();
+    const text = document.getElementById("pm-new-msg-text").value.trim();
     if(!text || !currentRecipient) return;
     const now = new Date();
     const msg = {
@@ -168,7 +173,7 @@ document.addEventListener("DOMContentLoaded", async function() {
     const convKey = getConversationKey(myUsername, currentRecipient);
     const newMsgRef = db.ref('messages/' + convKey).push();
     await newMsgRef.set(msg);
-    document.getElementById("message-input").value = "";
+    document.getElementById("pm-new-msg-text").value = "";
     await updateChatUsers();
     renderChatList();
   };
