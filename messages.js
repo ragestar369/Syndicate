@@ -37,7 +37,6 @@ let messageListener = null;
 // --- DOM Elements ---
 const chatListElem = () => document.getElementById("pm-user-select");
 const searchElem = () => document.getElementById("search-user");
-const chatHeaderElem = () => document.getElementById("chat-user");
 const messagesElem = () => document.getElementById("pm-chat-window");
 
 // --- Loader ---
@@ -135,12 +134,13 @@ document.addEventListener("DOMContentLoaded", async function() {
     return;
   }
 
-  // Logout
+  // Use correct ID for logout button
   document.getElementById("pm-logout-btn").onclick = function() {
     clearMemberSession();
     window.location.href = "index.html";
   };
-  // Back
+
+  // Back button
   document.getElementById("pm-back-btn").onclick = function() {
     window.location.href = "index.html";
   };
