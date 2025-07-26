@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>The Syndicate - Member Panel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Fonts and Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        #admin-login-fab {
+            position: fixed;
+            right: 2em;
+            bottom: 2em;
+            width: 3.4em;
+            height: 3.4em;
+            border-radius: 50%;
+            background: linear-gradient(90deg,#2de3ff 60%,#7bffe9 100%);
+            color: #222b4c;
+            border: none;
+            box-shadow: 0 4px 22px 0 #2de3ff22;
+            font-size: 1.5em;
+            cursor: pointer;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.13s;
+        }
+        #admin-login-fab:hover {
+            background: #2de3ff;
+            color: #fff;
+        }
+        #admin-modal {
+            display: none;
+            position: fixed;
+            z-index: 999;
+            left: 0; top: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(20,30,40,0.86);
+            align-items: center;
+            justify-content: center;
+        }
+        #admin-modal .modal-content {
+            background: #232635;
+            padding: 2em 2.4em;
+            border-radius: 13px;
+            box-shadow: 0 4px 22px 0 #2de3ff22;
+            min-width: 320px;
+            max-width: 95vw;
+            position: relative;
+        }
+        #admin-modal .close-btn {
+            position: absolute;
+            right: 1em;
+            top: 1em;
+            background: none;
+            border: none;
+            color: #2de3ff;
+            font-size: 1.7em;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="dark-bg">
+    
+    <canvas class="animated-bg-canvas"></canvas>
+
+    <div class="main-app">
+        <!-- Login Section -->
+        <section id="member-login-section" class="panel-section">
+            <div class="login-card">
+                <h2><i class="fa-solid fa-mask"></i> Syndicate Login</h2>
+                <form id="member-login-form" autocomplete="off">
+                    <input type="text" id="member-username" placeholder="Username" maxlength="40" required>
+                    <input type="password" id="member-password" placeholder="Password" maxlength="64" required>
+                    <button type="submit" class="btn-primary">Login</button>
+                </form>
+                <p id="member-login-error" class="error-message"></p>
+                <div class="login-hint">
+                    <i class="fa-solid fa-circle-info"></i>
+                    Only registered members can log in.
+                </div>
+            </div>
+        </section>
+
+        <!-- Announcements & Member Panel -->
+        <section id="announcements-section" class="panel-section" style="display:none;">
+           <header class="member-header">
+    <span id="member-welcome-msg"></span>
+    <div class="member-header-actions">
+        <button id="pm-btn" title="Private Messages" class="icon-btn">
+            <i class="fa-solid fa-envelope"></i>
+        </button>
+        <button id="tasks-btn" title="Tasks" class="icon-btn">
+            <i class="fa-solid fa-list-check"></i>
+        </button>
+        <button id="member-logout-btn" title="Logout" class="icon-btn">
+            <i class="fa-solid fa-sign-out-alt"></i>
+                  </button>
+                  </div>
+             </header>
+            <div class="main-content-flex">
+                <!-- Announcements Column -->
+                <div class="announcements-panel">
+                    <div class="filter-bar">
+                        <select id="announcement-filter-category"></select>
+                        <input type="text" id="announcement-filter-tag" placeholder="Filter by tag...">
+                    </div>
+                    <ul id="announcements-list"></ul>
+                    <div id="no-announcements" style="display:none;color:#b2bec3;padding:1.5em;text-align:center;">
+                        No announcements found.
+                    </div>
+                </div>
+
+                <!-- Member List Column -->
+                <aside class="members-panel">
+                    <h3><i class="fa-solid fa-users"></i> Members</h3>
+                    <ul id="member-list"></ul>
+                </aside>
+            </div>
+        </section>
+    </div>
+
+    <!-- Admin Login FAB -->
+    <button id="admin-login-fab" title="Admin Login"><i class="fa-solid fa-user-shield"></i></button>
+    <!-- Admin Modal (starts hidden, display:flex when open) -->
+    <div id="admin-modal" style="display: none;">
+      <div class="modal-content">
+        <button class="close-btn" id="admin-modal-close" title="Close">&times;</button>
+        <h2 style="color:#2de3ff;margin-top:0;text-align:center;"><i class="fa-solid fa-user-shield"></i> Admin Login</h2>
+        <form id="admin-login-form-modal" autocomplete="off">
+          <input type="text" id="admin-username" placeholder="Admin Username" maxlength="40" required autocomplete="username">
+          <input type="password" id="admin-password" placeholder="Admin Password" maxlength="64" required autocomplete="current-password">
+          <button type="submit" class="btn-primary">Login</button>
+        </form>
+        <div id="admin-login-error"></div>
+      </div>
+    </div>
+
+    <div id="pm-panel" class="modal" style="display:none;">
+        <div class="modal-content">
+            <button id="close-pm-modal" class="modal-close">&times;</button>
+            <form id="pm-form">
+                <label for="pm-to">To:</label>
+                <select id="pm-to"></select>
+                <textarea id="pm-text" placeholder="Your message..." required></textarea>
+                <button type="submit">Send</button>
+            </form>
+            <div id="pm-messages"></div>
+        </div>
+    </div>
+
+    <script src="animated-bg.js"></script>
+    <!-- Firebase SDKs: -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.1/firebase-database-compat.js"></script>
+    <script>
+      // Your Firebase configuration
+       
+      const firebaseConfig = {
+        apiKey: "AIzaSyAcKNUaCd3Xo-GUxBA_NmzVWfVpnVC-m0A",
+        authDomain: "syndicate-ragestar.firebaseapp.com",
+        databaseURL: "https://syndicate-ragestar-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "syndicate-ragestar",
+        storageBucket: "syndicate-ragestar.firebasestorage.app",
+        messagingSenderId: "999935359149",
+        appId: "1:999935359149:web:190243de7b87b8b429ae24",
+        measurementId: "G-728FW0TF79"
+      };
+      // Initialize Firebase
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.database();
+    </script>
+    <script src="sha256.js"></script>
+    <script src="script.js"></script>
+    <script>
+      // Admin login modal logic
+      (function() {
+        const fab = document.getElementById('admin-login-fab');
+        const modal = document.getElementById('admin-modal');
+        const closeBtn = document.getElementById('admin-modal-close');
+        const form = document.getElementById('admin-login-form-modal');
+        const error = document.getElementById('admin-login-error');
+        fab.onclick = function() {
+          modal.style.display = "flex";
+          error.textContent = "";
+          form.reset();
+        };
+        closeBtn.onclick = function() {
+          modal.style.display = "none";
+        };
+        window.onclick = function(e) {
+          if (e.target === modal) modal.style.display = "none";
+        };
+        form.onsubmit = function(e) {
+          e.preventDefault();
+          const uname = document.getElementById('admin-username').value.trim();
+          const pw = document.getElementById('admin-password').value;
+          // You can add proper admin authentication via Firebase if needed
+          if (uname === 'admin' && pw === 'admin123') {
+            error.style.color = "green";
+            error.textContent = "Login successful! Redirecting...";
+            setTimeout(function() {
+              window.location.href = "admin.html";
+            }, 500);
+          } else {
+            error.style.color = "#ff4b5c";
+            error.textContent = "Incorrect admin username or password.";
+          }
+        };
+      })();
+    </script>
+</body>
+</html>
