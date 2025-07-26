@@ -137,10 +137,10 @@ document.addEventListener("DOMContentLoaded", async function() {
   }
 
   // Logout
-  document.getElementById("logout-btn").onclick = function() {
-    clearMemberSession();
-    window.location.href = "index.html";
-  };
+  document.getElementById("pm-logout-btn").onclick = function() {
+  clearMemberSession();
+  window.location.href = "index.html";
+};
 
   allMembers = await getMemberList();
   await updateChatUsers();
