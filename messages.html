@@ -25,7 +25,8 @@
       .pm-msg-meta { font-size:0.85em; color:#7bffe9; margin-top:0.15em; }
       .pm-new-msg-form { display:flex; gap:0.7em; }
       .pm-new-msg-form textarea { flex:1; min-height:2.7em; border-radius:9px; border:1.5px solid #2de3ff33; background:#232635; color:#e3f7ff; font-size:1.07em; padding:0.6em 1em; }
-      .pm-new-msg-form button { background:linear-gradient(90deg,#2de3ff 60%,#7bffe9 100%); color:#181a20; border:none; border-radius:7px; padding:0.4em 1.2em; font-weight:700; font-size:1.11em; box-shadow: 0 2px 7px 0 #2de3ff17;}
+      .pm-new-msg-form button { background:linear-gradient(90deg,#2de3ff 60%,#7bffe9 100%); color:#181a20; border:none; border-radius:7px; padding:0.4em 1.2em; font-weight:700; font-size:1.11em; box-shadow:0 2px 7px 0 #2de3ff17; cursor:pointer;}
+      #search-user { background:#232635; color:#e3f7ff; border-radius:7px; border:1.5px solid #2de3ff33; padding:0.45em 1em; font-size:1em; margin-top:0.8em; width:100%; }
       @media (max-width:600px) {
         .pm-main{padding:1em 0.4em 2em 0.4em;}
         .pm-chat-window{padding:0.5em;}
@@ -45,8 +46,8 @@
         </div>
         <div class="pm-users-list">
             <label for="pm-user-select">Conversation with:</label>
-            <input type="text" id="search-user" placeholder="Search users..." style="margin-top:1em;">
             <select id="pm-user-select"></select>
+            <input type="text" id="search-user" placeholder="Search users...">
         </div>
         <div class="pm-chat-window" id="pm-chat-window">
             <!-- Messages will appear here -->
