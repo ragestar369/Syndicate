@@ -46,7 +46,7 @@ function showLoader(show) {
 
 // --- Render Chat List ---
 function renderChatList() {
-  const search = (searchElem().value || "").toLowerCase();
+  const search = (searchElem() && searchElem().value || "").toLowerCase();
   const filtered = allMembers.filter(
     m => m.username !== myUsername && (!search || m.username.toLowerCase().includes(search))
   );
@@ -56,20 +56,22 @@ function renderChatList() {
     ...filtered.filter(m => !chatUsers.includes(m.username))
   ];
 
-  chatListElem().innerHTML = sorted.length
-    ? sorted.map(m =>
-        `<option value="${escapeHtml(m.username)}">${escapeHtml(m.username)}</option>`
-      ).join("")
-    : `<option disabled>No users</option>`;
+  if (chatListElem()) {
+    chatListElem().innerHTML = sorted.length
+      ? sorted.map(m =>
+          `<option value="${escapeHtml(m.username)}">${escapeHtml(m.username)}</option>`
+        ).join("")
+      : `<option disabled>No users</option>`;
 
-  // If currentRecipient is not in filtered, reset to first
-  if (!sorted.find(m => m.username === currentRecipient)) {
-    currentRecipient = sorted.length ? sorted[0].username : null;
+    // If currentRecipient is not in filtered, reset to first
+    if (!sorted.find(m => m.username === currentRecipient)) {
+      currentRecipient = sorted.length ? sorted[0].username : null;
+    }
+    chatListElem().value = currentRecipient || "";
+
+    // If there is a recipient, open chat with them
+    if (currentRecipient) openChat(currentRecipient);
   }
-  chatListElem().value = currentRecipient || "";
-
-  // If there is a recipient, open chat with them
-  if (currentRecipient) openChat(currentRecipient);
 }
 
 // --- Open Chat ---
@@ -79,7 +81,9 @@ function openChat(username) {
     messageListener = null;
   }
   currentRecipient = username;
-  messagesElem().innerHTML = `<div style="color:#7bffe9;padding:1em;text-align:center;">Loading...</div>`;
+  if (messagesElem()) {
+    messagesElem().innerHTML = `<div style="color:#7bffe9;padding:1em;text-align:center;">Loading...</div>`;
+  }
 
   // Listen for messages
   const convKey = getConversationKey(myUsername, currentRecipient);
@@ -91,10 +95,12 @@ function openChat(username) {
       for(const k in val) msgs.push(val[k]);
       msgs.sort((a,b) => new Date(a.time) - new Date(b.time));
     }
-    messagesElem().innerHTML = msgs.length
-      ? msgs.map(m => renderMessageBubble(m)).join("")
-      : `<div style="color:#7bffe9;padding:1em;text-align:center;">No messages yet.</div>`;
-    messagesElem().scrollTop = messagesElem().scrollHeight;
+    if (messagesElem()) {
+      messagesElem().innerHTML = msgs.length
+        ? msgs.map(m => renderMessageBubble(m)).join("")
+        : `<div style="color:#7bffe9;padding:1em;text-align:center;">No messages yet.</div>`;
+      messagesElem().scrollTop = messagesElem().scrollHeight;
+    }
   });
 }
 
@@ -134,16 +140,21 @@ document.addEventListener("DOMContentLoaded", async function() {
     return;
   }
 
-  // Use correct ID for logout button
-  document.getElementById("pm-logout-btn").onclick = function() {
-    clearMemberSession();
-    window.location.href = "index.html";
-  };
+  // Use correct ID for logout button and back button, and check if element exists before setting onclick
+  const logoutBtn = document.getElementById("pm-logout-btn");
+  if (logoutBtn) {
+    logoutBtn.onclick = function() {
+      clearMemberSession();
+      window.location.href = "index.html";
+    };
+  }
 
-  // Back button
-  document.getElementById("pm-back-btn").onclick = function() {
-    window.location.href = "index.html";
-  };
+  const backBtn = document.getElementById("pm-back-btn");
+  if (backBtn) {
+    backBtn.onclick = function() {
+      window.location.href = "index.html";
+    };
+  }
 
   allMembers = await getMemberList();
   await updateChatUsers();
@@ -151,30 +162,38 @@ document.addEventListener("DOMContentLoaded", async function() {
   showLoader(false);
 
   // Search users
-  searchElem().oninput = renderChatList;
+  if (searchElem()) {
+    searchElem().oninput = renderChatList;
+  }
 
   // Change conversation partner
-  chatListElem().onchange = function() {
-    openChat(chatListElem().value);
-  };
+  if (chatListElem()) {
+    chatListElem().onchange = function() {
+      openChat(chatListElem().value);
+    };
+  }
 
   // Send message
-  document.getElementById("pm-new-msg-form").onsubmit = async function(e) {
-    e.preventDefault();
-    const text = document.getElementById("pm-new-msg-text").value.trim();
-    if(!text || !currentRecipient) return;
-    const now = new Date();
-    const msg = {
-      from: myUsername,
-      to: currentRecipient,
-      text,
-      time: now.toLocaleString()
+  const msgForm = document.getElementById("pm-new-msg-form");
+  if (msgForm) {
+    msgForm.onsubmit = async function(e) {
+      e.preventDefault();
+      const textElem = document.getElementById("pm-new-msg-text");
+      const text = textElem ? textElem.value.trim() : "";
+      if(!text || !currentRecipient) return;
+      const now = new Date();
+      const msg = {
+        from: myUsername,
+        to: currentRecipient,
+        text,
+        time: now.toLocaleString()
+      };
+      const convKey = getConversationKey(myUsername, currentRecipient);
+      const newMsgRef = db.ref('messages/' + convKey).push();
+      await newMsgRef.set(msg);
+      if (textElem) textElem.value = "";
+      await updateChatUsers();
+      renderChatList();
     };
-    const convKey = getConversationKey(myUsername, currentRecipient);
-    const newMsgRef = db.ref('messages/' + convKey).push();
-    await newMsgRef.set(msg);
-    document.getElementById("pm-new-msg-text").value = "";
-    await updateChatUsers();
-    renderChatList();
-  };
+  }
 });
