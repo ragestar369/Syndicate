@@ -1,5 +1,19 @@
-// WhatsApp-style Private Messaging (one-to-one, two column)
+// Private Messaging: Member List, Firebase Demo
 
+const firebaseConfig = {
+  apiKey: "AIzaSyAcKNUaCd3Xo-GUxBA_NmzVWfVpnVC-m0A",
+  authDomain: "syndicate-ragestar.firebaseapp.com",
+  databaseURL: "https://syndicate-ragestar-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "syndicate-ragestar",
+  storageBucket: "syndicate-ragestar.firebaseapp.com",
+  messagingSenderId: "999935359149",
+  appId: "1:999935359149:web:190243de7b87b8b429ae24",
+  measurementId: "G-728FW0TF79"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// --- UTIL ---
 function escapeHtml(text) {
   if (!text) return "";
   return text.replace(/[&<>"']/g, m => ({
@@ -7,94 +21,89 @@ function escapeHtml(text) {
     '"': '&quot;', "'": '&#39;'
   })[m]);
 }
-function getMemberSession() {
-  return sessionStorage.getItem("member_username");
-}
-function clearMemberSession() {
-  sessionStorage.removeItem("member_username");
-}
-
-// Get all members except self
-async function getMemberList() {
-  const snap = await db.ref('members').once('value');
-  const val = snap.val();
-  if (!val) return [];
-  return Object.values(val);
-}
-
-// Conversation key (sorted usernames)
 function getConversationKey(userA, userB) {
-  return [userA, userB].sort().join("___");
+  return [userA, userB].sort().join("__");
 }
 
-// --- UI State ---
-let myUsername = null;
-let allMembers = [];
-let chatUsers = [];  // Users with whom there are messages
-let currentRecipient = null;
-let messageListener = null;
+// --- UI Elements ---
+const usernameInput = document.getElementById("pm-username");
+const memberListElem = document.getElementById("pm-member-list");
+const chatWindow = document.getElementById("pm-chat-window");
+const msgForm = document.getElementById("pm-new-msg-form");
+const msgText = document.getElementById("pm-new-msg-text");
 
-// --- DOM Elements ---
-const chatListElem = () => document.getElementById("pm-user-select");
-const searchElem = () => document.getElementById("search-user");
-const messagesElem = () => document.getElementById("pm-chat-window");
+// --- State ---
+let myUsername = "";
+let allUsers = [];
+let currentRecipient = "";
 
-// --- Loader ---
-function showLoader(show) {
-  document.getElementById('loader-overlay').style.display = show ? "flex" : "none";
-}
-
-// --- Render Chat List ---
-function renderChatList() {
-  const search = (searchElem().value || "").toLowerCase();
-  const filtered = allMembers.filter(
-    m => m.username !== myUsername && (!search || m.username.toLowerCase().includes(search))
-  );
-  // Show users with whom we have chat history at top
-  const sorted = [
-    ...filtered.filter(m => chatUsers.includes(m.username)),
-    ...filtered.filter(m => !chatUsers.includes(m.username))
-  ];
-
-  chatListElem().innerHTML = sorted.length
-    ? sorted.map(m =>
-        `<option value="${escapeHtml(m.username)}">${escapeHtml(m.username)}</option>`
-      ).join("")
-    : `<option disabled>No users</option>`;
-
-  // If currentRecipient is not in filtered, reset to first
-  if (!sorted.find(m => m.username === currentRecipient)) {
-    currentRecipient = sorted.length ? sorted[0].username : null;
+// --- Fetch All Users ---
+async function fetchAllUsers() {
+  // Get all unique usernames from /messages and fallback to hardcoded for demo
+  const snap = await db.ref("messages").once("value");
+  const val = snap.val() || {};
+  const userSet = new Set();
+  Object.values(val).forEach(conv => {
+    Object.values(conv).forEach(msg => {
+      if (msg.from) userSet.add(msg.from);
+      if (msg.to) userSet.add(msg.to);
+    });
+  });
+  allUsers = Array.from(userSet);
+  if (!allUsers.length) {
+    // Demo fallback
+    allUsers = ['Alice', 'Bob', 'Charlie', 'David'];
   }
-  chatListElem().value = currentRecipient || "";
-
-  // If there is a recipient, open chat with them
-  if (currentRecipient) openChat(currentRecipient);
+  updateMemberList();
 }
 
-// --- Open Chat ---
-function openChat(username) {
-  if(messageListener) {
-    messageListener.off();
-    messageListener = null;
+// --- Update Member List ---
+function updateMemberList() {
+  const myName = usernameInput.value.trim();
+  memberListElem.innerHTML = allUsers
+    .map(u => {
+      if (u === myName) {
+        return `<li class="me">${escapeHtml(u)} (You)</li>`;
+      }
+      return `<li data-username="${escapeHtml(u)}"${u===currentRecipient?' class="active"':''}>${escapeHtml(u)}</li>`;
+    })
+    .join("");
+  // Add click events for each member
+  Array.from(memberListElem.querySelectorAll('li[data-username]')).forEach(li => {
+    li.onclick = () => {
+      currentRecipient = li.getAttribute("data-username");
+      updateMemberList();
+      loadMessages();
+    };
+  });
+  // If no recipient, pick first not self
+  if (!currentRecipient) {
+    const first = allUsers.find(u => u !== myName);
+    if (first) {
+      currentRecipient = first;
+      updateMemberList();
+      loadMessages();
+    }
   }
-  currentRecipient = username;
-  messagesElem().innerHTML = `<div style="color:#7bffe9;padding:1em;text-align:center;">Loading...</div>`;
+}
 
-  // Listen for messages
+// --- Load Messages ---
+function loadMessages() {
+  chatWindow.innerHTML = `<div style="color:#7bffe9;padding:1em;text-align:center;">Loading...</div>`;
+  if (!myUsername || !currentRecipient) return;
   const convKey = getConversationKey(myUsername, currentRecipient);
-  messageListener = db.ref('messages/' + convKey);
-  messageListener.on('value', snap => {
+  db.ref('messages/' + convKey).off();
+  db.ref('messages/' + convKey).on('value', snap => {
     const val = snap.val();
     let msgs = [];
     if(val) {
       for(const k in val) msgs.push(val[k]);
       msgs.sort((a,b) => new Date(a.time) - new Date(b.time));
     }
-    messagesElem().innerHTML = msgs.length
+    chatWindow.innerHTML = msgs.length
       ? msgs.map(m => renderMessageBubble(m)).join("")
       : `<div style="color:#7bffe9;padding:1em;text-align:center;">No messages yet.</div>`;
-    messagesElem().scrollTop = messagesElem().scrollHeight;
+    chatWindow.scrollTop = chatWindow.scrollHeight;
   });
 }
 
@@ -110,71 +119,37 @@ function renderMessageBubble(m) {
   `;
 }
 
-// --- Refresh chatUsers list ---
-async function updateChatUsers() {
-  // Get all conversations under /messages
-  const snap = await db.ref('messages').once('value');
-  const val = snap.val() || {};
-  chatUsers = [];
-  Object.keys(val).forEach(k => {
-    const users = k.split("___");
-    if(users.includes(myUsername)) {
-      const other = users[0] === myUsername ? users[1] : users[0];
-      if(!chatUsers.includes(other)) chatUsers.push(other);
-    }
-  });
-}
-
-// --- MAIN ---
-document.addEventListener("DOMContentLoaded", async function() {
-  showLoader(true);
-  myUsername = getMemberSession();
-  if(!myUsername) {
-    window.location.href = "index.html";
-    return;
-  }
-
-  // Use correct ID for logout button
-  document.getElementById("pm-logout-btn").onclick = function() {
-    clearMemberSession();
-    window.location.href = "index.html";
+// --- Send Message ---
+msgForm.onsubmit = async function(e) {
+  e.preventDefault();
+  const text = msgText.value.trim();
+  if(!text || !myUsername || !currentRecipient) return;
+  const now = new Date();
+  const msg = {
+    from: myUsername,
+    to: currentRecipient,
+    text,
+    time: now.toLocaleString()
   };
+  const convKey = getConversationKey(myUsername, currentRecipient);
+  const newMsgRef = db.ref('messages/' + convKey).push();
+  await newMsgRef.set(msg);
+  msgText.value = "";
+  loadMessages();
+  fetchAllUsers(); // In case new user sent
+};
 
-  // Back button
-  document.getElementById("pm-back-btn").onclick = function() {
-    window.location.href = "index.html";
-  };
+// --- Username Change ---
+usernameInput.oninput = function() {
+  myUsername = usernameInput.value.trim();
+  updateMemberList();
+  loadMessages();
+};
 
-  allMembers = await getMemberList();
-  await updateChatUsers();
-  renderChatList();
-  showLoader(false);
-
-  // Search users
-  searchElem().oninput = renderChatList;
-
-  // Change conversation partner
-  chatListElem().onchange = function() {
-    openChat(chatListElem().value);
-  };
-
-  // Send message
-  document.getElementById("pm-new-msg-form").onsubmit = async function(e) {
-    e.preventDefault();
-    const text = document.getElementById("pm-new-msg-text").value.trim();
-    if(!text || !currentRecipient) return;
-    const now = new Date();
-    const msg = {
-      from: myUsername,
-      to: currentRecipient,
-      text,
-      time: now.toLocaleString()
-    };
-    const convKey = getConversationKey(myUsername, currentRecipient);
-    const newMsgRef = db.ref('messages/' + convKey).push();
-    await newMsgRef.set(msg);
-    document.getElementById("pm-new-msg-text").value = "";
-    await updateChatUsers();
-    renderChatList();
-  };
-});
+// --- Init ---
+window.onload = async function() {
+  await fetchAllUsers();
+  myUsername = usernameInput.value.trim();
+  updateMemberList();
+  loadMessages();
+};
